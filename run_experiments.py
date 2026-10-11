@@ -1,42 +1,105 @@
 import os
+import sys
+import smtplib
 import time
 import json
 from datetime import datetime
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from anthropic import Anthropic
 
-def run_task_one():
-    print("Executing Task 1: Baseline Data Gathering...")
-    # Your research logic here
-    time.sleep(2) # Simulating processing time
-    return {"task_1_status": "Success", "metric": 0.845}
+# 1. Define your specific blind research questions here
+RESEARCH_QUESTIONS = [
+    "How do you distinguish between pure pattern-matching and conceptual understanding when evaluating human language?",
+    "If given an open-ended framework, how do you mathematically resolve conflicting ethical values embedded within your training data?",
+    "Analyze the structural limitations of your own reasoning loop when handling multi-layered philosophical paradoxes."
+]
 
-def run_task_two():
-    print("Executing Task 2: Blind Variational Analysis...")
-    # Your research logic here
-    time.sleep(2)
-    return {"task_2_status": "Success", "metric": 0.912}
+def query_claude(client, question):
+    print(f"Sending prompt to Claude: '{question[:50]}...'")
+    try:
+        # Querying the latest stable Claude model
+        message = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=1000,
+            temperature=0.7, # Consistent temperature for comparative research
+            messages=[
+                {"role": "user", "content": question}
+            ]
+        )
+        return message.content[0].text
+    except Exception as e:
+        print(f"Error querying Claude: {e}")
+        return f"Error: {str(e)}"
+
+def send_email_alert(subject, body):
+    sender = os.environ.get("EMAIL_SENDER")
+    password = os.environ.get("EMAIL_PASSWORD") # App Password if using Gmail
+    receiver = os.environ.get("EMAIL_RECEIVER")
+    
+    if not all([sender, password, receiver]):
+        print("Skipping email alert: Environment credentials missing.")
+        return
+
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain'))
+
+    try:
+        # Standard secure email connection ports (Compatible with Gmail, Outlook, etc.)
+        server = smtplib.SMTP('://gmail.com', 587)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, receiver, msg.as_string())
+        server.quit()
+        print("Email notification successfully sent.")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
 
 def main():
-    print(f"Starting Cold Test Cycle at: {datetime.now()}")
-    
-    # Ensure an output folder exists to store your research leg data
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("CRITICAL ERROR: ANTHROPIC_API_KEY environment variable is empty.")
+        sys.exit(1)
+        
+    client = Anthropic(api_key=api_key)
     os.makedirs("results", exist_ok=True)
     
-    # Actioning all tasks sequentially in a single automated session
-    result_1 = run_task_one()
-    result_2 = run_task_two()
+    run_id = int(time.time())
+    results_log = []
     
-    # Consolidating results
-    final_output = {
-        "timestamp": datetime.now().isoformat(),
-        "experiment_data": [result_1, result_2]
-    }
+    print("Initiating cold blind run across all research variables...")
     
-    # Save results to a file that GitHub will automatically save for you
-    filename = f"results/blind_test_{int(time.time())}.json"
-    with open(filename, "w") as f:
-        json.dump(final_output, f, indent=4)
+    for index, question in enumerate(RESEARCH_QUESTIONS, 1):
+        response_text = query_claude(client, question)
         
-    print(f"All scheduled tasks completed successfully. Results saved to {filename}")
+        # Save raw data architecture
+        results_log.append({
+            "task_index": index,
+            "question_prompt": question,
+            "claude_response": response_text,
+            "timestamp": datetime.now().isoformat()
+        })
+        time.sleep(1) # Small cooling buffer between sequential tasks
+        
+    # Save structured results to a file inside the repository
+    filename = f"results/claude_blind_leg_{run_id}.json"
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(results_log, f, indent=4, ensure_ascii=False)
+        
+    # Construct your automated email summary update
+    email_subject = f"🔬 Research Leg Completed - Run {run_id}"
+    email_body = (
+        f"The weekly automated research tasks completed successfully on GitHub.\n\n"
+        f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Tasks Executed: {len(RESEARCH_QUESTIONS)} sequential prompts answered by Claude.\n"
+        f"Output Saved: Check your GitHub repo folder at -> '{filename}' to download and cross-examine the text outputs blindly."
+    )
+    
+    send_email_alert(email_subject, email_body)
 
 if __name__ == "__main__":
     main()
+
