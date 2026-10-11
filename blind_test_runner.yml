@@ -3,7 +3,7 @@ name: Cold Blind Research Runner
 # This controls when the workflow runs
 on:
   schedule:
-    # Triggers every Monday at 00:00 UTC (Once a week execution)
+    # Triggers every Monday at 10:00 AWST (Once a week execution)
     - cron: '0 0 * * 1'
   
   # Allows you to manually trigger the leg of research anytime from the GitHub UI
